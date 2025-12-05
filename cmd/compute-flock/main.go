@@ -2,15 +2,21 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/lunarhue/compute-flock/pkg/discovery"
 	"github.com/lunarhue/compute-flock/pkg/system"
+	"google.golang.org/grpc"
 
 	zeroconf "github.com/lunarhue/compute-flock-zeroconf"
+	pb "github.com/lunarhue/compute-flock/pkg/proto/adoption/v1"
 )
 
 // Global State
@@ -21,19 +27,19 @@ var (
 )
 
 type server struct {
-	pb.UnimplementedHiveServiceServer
+	pb.UnimplementedFlockServiceServer
 }
 
 // Handle Adoption Request
 func (s *server) Adopt(ctx context.Context, req *pb.AdoptRequest) (*pb.AdoptResponse, error) {
-	log.Printf("Received ADOPT command. Role: %s, Controller: %s", req.Role, req.Controller_ip)
+	log.Printf("Received ADOPT command. Role: %s, Controller: %s", req.Role, req.ControllerIp)
 
 	// 1. Write Config
 	conf := system.K3sConfig{
 		Role:         req.Role,
-		Token:        req.Cluster_token,
-		ControllerIP: req.Controller_ip,
-		ClusterInit:  (req.Role == "server" && req.Controller_ip == ""), // simplified logic
+		Token:        req.ClusterToken,
+		ControllerIP: req.ControllerIp,
+		ClusterInit:  (req.Role == "server" && req.ControllerIp == ""), // simplified logic
 	}
 
 	// 2. Trigger NixOS Rebuild (Blocking operation)
@@ -52,6 +58,57 @@ func (s *server) Adopt(ctx context.Context, req *pb.AdoptRequest) (*pb.AdoptResp
 
 func (s *server) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.HeartbeatResponse, error) {
 	return &pb.HeartbeatResponse{Reconfigure: false}, nil
+}
+
+func main() {
+	mode := flag.String("mode", "auto", "Force mode: controller, compute, auto")
+	flag.Parse()
+
+	hostname, _ := os.Hostname()
+	NodeID = hostname
+
+	// Start GRPC Server (Listens on all modes)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	s := grpc.NewServer()
+	pb.RegisterFlockServiceServer(s, &server{})
+	go s.Serve(lis)
+
+	// STATE MACHINE
+	switch *mode {
+	case "controller":
+		runControllerMode()
+	case "compute":
+		runComputeMode()
+	case "auto":
+		runPendingMode()
+	}
+}
+
+// ---------------------------------------------------------
+// Mode: COMPUTE (The "Worker" State)
+// ---------------------------------------------------------
+func runComputeMode() {
+	log.Println("State: COMPUTE. Connecting to Cluster...")
+
+	// Survivability Loop
+	for {
+		// Try to find controller
+		controllerIP := discovery.ScanForControllers(5 * time.Second)
+
+		if controllerIP == "" {
+			log.Println("⚠️ Lost Controller! Scanning...")
+			// Logic: If lost for too long, maybe revert to PENDING?
+			// For now, just keep looking.
+		} else {
+			log.Printf("✅ Connected to Controller at %s", controllerIP)
+			// Send Heartbeat via gRPC here
+		}
+
+		time.Sleep(10 * time.Second)
+	}
 }
 
 // ---------------------------------------------------------
@@ -116,3 +173,21 @@ func runPendingMode() {
 }
 
 // ... [runComputeMode and adoptNode remain the same] ...
+
+func adoptNode(ip string, role string) {
+	conn, _ := grpc.Dial(fmt.Sprintf("%s:%d", ip, Port), grpc.WithInsecure())
+	defer conn.Close()
+
+	client := pb.NewFlockServiceClient(conn)
+	_, err := client.Adopt(context.Background(), &pb.AdoptRequest{
+		ClusterToken: "my-secret-token",
+		ControllerIp: "192.168.1.10", // Self IP
+		Role:         role,
+	})
+
+	if err != nil {
+		log.Printf("Failed to adopt %s: %v", ip, err)
+	} else {
+		log.Printf("Successfully sent adoption command to %s", ip)
+	}
+}
