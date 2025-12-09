@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/lunarhue/libs-go/log"
 
@@ -39,6 +40,7 @@ type server struct {
 
 func (s *server) Adopt(ctx context.Context, req *pb.AdoptRequest) (*pb.AdoptResponse, error) {
 	log.Infof("Received ADOPT command. Role: %s, Controller: %s", req.Role, req.ControllerIp)
+	log.Infof("Cluster Token: %s", req.ClusterToken)
 
 	return &pb.AdoptResponse{Success: true, Message: "Adoption started"}, nil
 }
@@ -126,9 +128,17 @@ func adoptNode(controllerIp, computeIp string, role string) {
 
 	defer conn.Close()
 
+	adoptionToken, err := k3s.CreateJoinToken("compute-flock-node", 10*time.Minute)
+	if err != nil {
+		log.Errorf("Failed to create join token: %v", err)
+		return
+	}
+
+	log.Infof("Generated join token for %s: %s", computeIp, adoptionToken)
+
 	client := pb.NewFlockServiceClient(conn)
 	_, err = client.Adopt(context.Background(), &pb.AdoptRequest{
-		ClusterToken: "my-secret-token",
+		ClusterToken: adoptionToken,
 		ControllerIp: controllerIp,
 		Role:         role,
 	})
