@@ -70,15 +70,10 @@
                 description = "The package to use.";
               };
 
-              apiToken = mkOption {
+              mode = mkOption {
                 type = types.str;
-                default = "";
-                description = "Token for authentication (passed as env var).";
-              };
-              
-              logLevel = mkOption {
-                type = types.enum [ "info" "debug" "warn" ];
-                default = "info";
+                default = "agent";
+                description = "Mode in which to run Compute Flock (agent/controller).";
               };
             };
 
@@ -90,10 +85,9 @@
                 wantedBy = [ "multi-user.target" ];
 
                 serviceConfig = {
-                  ExecStart = "${cfg.package}/bin/compute-flock";
+                  ExecStart = "${cfg.package}/bin/compute-flock --mode ${cfg.mode}";
                   Environment = [ 
-                    "FLOCK_TOKEN=${cfg.apiToken}"
-                    "FLOCK_LOG_LEVEL=${cfg.logLevel}"
+
                   ];
                   
                   # Hardening
