@@ -78,6 +78,18 @@
             };
 
             config = lib.mkIf cfg.enable {
+              networking.firewall = {
+                  allowedTCPPorts = [ 
+                    6443   # Kubernetes API
+                    10250  # Kubelet Metrics
+                    9000   # Compute Flock Controller
+                  ];
+                  allowedUDPPorts = [ 
+                    8472   # Flannel VXLAN
+                    5353   # mDNS
+                  ];
+                };
+
               systemd.services.compute-flock = {
                 description = "Compute Flock Agent";
                 after = [ "network-online.target" "k3s.service" ];
