@@ -26,7 +26,7 @@ func JoinCluster(serverURL string, token string) error {
 	}
 
 	// 3. Prepare the Context with a Timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// 4. Prepare the Agent Command
@@ -44,7 +44,7 @@ func JoinCluster(serverURL string, token string) error {
 		return err
 	}
 
-	log.Infof("Starting temporary K3s Agent (10 second run) against %s...\n", serverURL)
+	log.Infof("Starting temporary K3s Agent (30 second run) against %s...\n", serverURL)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start temporary agent: %w", err)
