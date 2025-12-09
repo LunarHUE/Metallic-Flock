@@ -25,7 +25,7 @@ func VerifyK3sInstallation() error {
 	}
 	log.Info("[OK] Supported Linux distribution detected.")
 
-	if err := checkProcessArgs("k3s", "--server"); err != nil {
+	if err := checkProcessArgs("k3s", "server"); err != nil {
 		log.Panicf("[FAIL] K3s process argument check failed: %v", err)
 	}
 	log.Info("[OK] K3s process is running with expected arguments.")
