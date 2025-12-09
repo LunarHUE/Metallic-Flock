@@ -97,7 +97,8 @@
                 wantedBy = [ "multi-user.target" ];
 
                 path = with pkgs; [ 
-                  procps
+                  procps    # for pgrep
+                  iptables  # for iptables checks
                 ];
 
                 serviceConfig = {
