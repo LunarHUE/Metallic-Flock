@@ -52,7 +52,7 @@ func (s *server) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.H
 }
 
 func main() {
-	mode := flag.String("mode", "auto", "Force mode: controller, agent, auto")
+	mode := flag.String("mode", "auto", "Force mode: server, agent, auto")
 	noVerify := flag.Bool("no-verify", false, "Skip K3s installation verification")
 	flag.Parse()
 
@@ -84,7 +84,7 @@ func main() {
 
 	// STATE MACHINE
 	switch *mode {
-	case "controller":
+	case "server":
 		discovery.RunControllerMode(NodeID, uint16(DefaultPort), func(ip, role string) { adoptNode(currentLocalIP(), ip, role) })
 	case "agent":
 		discovery.RunPendingMode(NodeID, uint16(DefaultPort))
