@@ -1,5 +1,5 @@
 {
-  description = "Compute Flock - Pre-compiled Binary Deployment";
+  description = "Compute Flock - Distributed Computing Agent";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -11,100 +11,100 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
-        # 1. Determine Architecture for download URL
-        # We need to map NixOS system names to your Release binary names
-        arch = if system == "x86_64-linux" then "amd64"
-               else if system == "aarch64-linux" then "arm64"
-               else throw "Unsupported system: ${system}";
-
-        version = "0.0.1"; # Update this to your release tag
-
-        # 2. Define the Package (Downloads Binary, doesn't build)
-        compute-flock-bin = pkgs.stdenv.mkDerivation {
+        recipe = { lib, ... }: pkgs.buildGoModule {
           pname = "compute-flock";
-          inherit version;
+          version = "0.0.2"; # You can also read this from a file if you want
 
-          # DOWNLOADS THE BINARY DIRECTLY
-          src = pkgs.fetchurl {
-            # Assumes your release binary is named "compute-flock_linux_amd64"
-            url = "https://github.com/lunarhue/compute-flock/releases/download/v${version}/compute-flock_linux_${arch}";
-            
-            # YOU MUST UPDATE THESE HASHES WHEN YOU UPDATE THE VERSION
-            # Nix needs to know the hash of the file before downloading it.
-            sha256 = if system == "x86_64-linux" 
-                     then "sha256-0000000000000000000000000000000000000000000=" # Replace with actual hash
-                     else "sha256-0000000000000000000000000000000000000000000="; # Replace with actual hash
+          src = lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.unions [
+              ./cmd
+              ./pkg
+              ./go.mod
+              ./go.sum
+            ];
           };
 
-          dontUnpack = true; # It's a binary, not a tarball, so don't try to unzip it
+          vendorHash = "sha256-0000000000000000000000000000000000000000000=";
+          CGO_ENABLED = 0;
+          ldflags = [
+            "-s" "-w"
+            "-X main.Version=0.0.1"
+          ];
 
-          installPhase = ''
-            mkdir -p $out/bin
-            cp $src $out/bin/compute-flock
-            chmod +x $out/bin/compute-flock
-          '';
+          meta = with lib; {
+            description = "Compute Flock Agent";
+            homepage = "https://github.com/lunarhue/compute-flock";
+            license = licenses.mit;
+          };
         };
 
-      in {
-        # Export the package
-        packages.default = compute-flock-bin;
-        packages.compute-flock = compute-flock-bin;
-      }
-    ) // {
-      # 3. Define the NixOS Module
-      # This part runs on the server to configure Systemd
-      nixosModules.default = { config, lib, pkgs, ... }:
-        let
-          cfg = config.services.compute-flock;
-        in {
-          options.services.compute-flock = with lib; {
-            enable = mkEnableOption "Compute Flock Agent";
+      in rec {
+        # 2. PACKAGES
+        packages.compute-flock = pkgs.callPackage recipe {};
+        packages.default = packages.compute-flock;
 
-            package = mkOption {
-              type = types.package;
-              default = self.packages.${pkgs.system}.default;
-              description = "The compute-flock package to use.";
-            };
-
-            # Example Config Option: The API Token
-            apiToken = mkOption {
-              type = types.str;
-              default = "";
-              description = "The authentication token for the flock.";
-            };
+        # 3. DEV SHELL
+        devShells.default = pkgs.mkShell {
+          inputsFrom = [ packages.default ];
+          packages = with pkgs; [
+            go
+            gopls
+            gotools
+            golangci-lint
+          ];
+        };
+      })
+      
+      # 4. NIXOS MODULE (Systemd Configuration)
+      // flake-utils.lib.eachDefaultSystemPassThrough (system: {
+        nixosModules.default = { pkgs, lib, config, ...}:
+          let cfg = config.services.compute-flock; in {
             
-            # Example Config Option: Extra args
-            extraArgs = mkOption {
-              type = types.listOf types.str;
-              default = [];
-              description = "Extra arguments to pass to the binary.";
+            options.services.compute-flock = with lib; {
+              enable = mkEnableOption "Compute Flock Service";
+
+              package = mkOption {
+                type = types.package;
+                default = self.packages.${pkgs.system}.default;
+                description = "The package to use.";
+              };
+
+              apiToken = mkOption {
+                type = types.str;
+                default = "";
+                description = "Token for authentication (passed as env var).";
+              };
+              
+              logLevel = mkOption {
+                type = types.enum [ "info" "debug" "warn" ];
+                default = "info";
+              };
             };
-          };
 
-          config = lib.mkIf cfg.enable {
-            systemd.services.compute-flock = {
-              description = "Compute Flock Agent Service";
-              wantedBy = [ "multi-user.target" ];
-              wants = [ "network-online.target" ];
-              after = [ "network-online.target" ];
+            config = lib.mkIf cfg.enable {
+              systemd.services.compute-flock = {
+                description = "Compute Flock Agent";
+                wants = [ "network-online.target" ];
+                after = [ "network-online.target" ];
+                wantedBy = [ "multi-user.target" ];
 
-              serviceConfig = {
-                ExecStart = "${cfg.package}/bin/compute-flock ${lib.escapeShellArgs cfg.extraArgs}";
-                Restart = "always";
-                RestartSec = "10s";
-                
-                # Security Hardening (Similar to Himmelblau)
-                DynamicUser = true; # Runs as a restricted, ephemeral user
-                StateDirectory = "compute-flock"; # Creates /var/lib/compute-flock
-                CacheDirectory = "compute-flock"; # Creates /var/cache/compute-flock
-                
-                # Pass secrets via Environment variables to avoid them showing in 'ps'
-                Environment = [
-                  "FLOCK_TOKEN=${cfg.apiToken}"
-                ];
+                serviceConfig = {
+                  ExecStart = "${cfg.package}/bin/compute-flock";
+                  Environment = [ 
+                    "FLOCK_TOKEN=${cfg.apiToken}"
+                    "FLOCK_LOG_LEVEL=${cfg.logLevel}"
+                  ];
+                  
+                  # Hardening
+                  DynamicUser = true;
+                  Restart = "always";
+                  RestartSec = "5s";
+                  StateDirectory = "compute-flock";
+                  CacheDirectory = "compute-flock";
+                };
               };
             };
           };
-        };
-    };
+      });
 }
