@@ -92,8 +92,11 @@
 
               systemd.services.compute-flock = {
                 description = "Compute Flock Agent";
-                after = [ "network-online.target" "k3s.service" ];
-                wants = [ "k3s.service" ];
+                after = [
+                  "network-online.target"
+                  # "k3s.service"
+                ];
+                # wants = [ "k3s.service" ];
                 wantedBy = [ "multi-user.target" ];
 
                 path = with pkgs; [
