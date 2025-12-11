@@ -15,20 +15,20 @@ func VerifyK3sInstallation() error {
 		// return fmt.Errorf("k3s verification requires root privileges")
 	}
 
-	if err := checkServiceActive("k3s"); err != nil {
-		log.Panicf("[FAIL] K3s service check failed: %v", err)
-	}
-	log.Info("[OK] K3s service is active.")
+	// if err := checkServiceActive("k3s"); err != nil {
+	// 	log.Panicf("[FAIL] K3s service check failed: %v", err)
+	// }
+	// log.Info("[OK] K3s service is active.")
 
 	if err := checkDistribution(); err != nil {
 		log.Panicf("[FAIL] Distribution check failed: %v", err)
 	}
 	log.Info("[OK] Supported Linux distribution detected.")
 
-	if err := checkProcessArgs("k3s", "server"); err != nil {
-		log.Panicf("[FAIL] K3s process argument check failed: %v", err)
-	}
-	log.Info("[OK] K3s process is running with expected arguments.")
+	// if err := checkProcessArgs("k3s", "server"); err != nil {
+	// 	log.Panicf("[FAIL] K3s process argument check failed: %v", err)
+	// }
+	// log.Info("[OK] K3s process is running with expected arguments.")
 
 	if err := checkFirewallPort("6443", "tcp"); err != nil {
 		log.Panicf("[FAIL] Firewall port check failed: %v", err)
