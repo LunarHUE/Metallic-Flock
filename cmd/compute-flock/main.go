@@ -61,7 +61,7 @@ func main() {
 
 	// Verify that the prerequisites are met
 	if !*noVerify {
-		if err := k3s.VerifyK3sInstallation(); err != nil {
+		if err := k3s.VerifyK3sInstallation(*mode); err != nil {
 			log.Panicf("K3s verification failed: %v", err)
 		}
 	}

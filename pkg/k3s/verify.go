@@ -9,26 +9,35 @@ import (
 	"github.com/lunarhue/libs-go/log"
 )
 
-func VerifyK3sInstallation() error {
+func VerifyK3sInstallation(mode string) error {
 	if os.Geteuid() != 0 {
 		log.Warnf("Not running as root. Firewall checks might fail.")
 		// return fmt.Errorf("k3s verification requires root privileges")
 	}
-
-	// if err := checkServiceActive("k3s"); err != nil {
-	// 	log.Panicf("[FAIL] K3s service check failed: %v", err)
-	// }
-	// log.Info("[OK] K3s service is active.")
 
 	if err := checkDistribution(); err != nil {
 		log.Panicf("[FAIL] Distribution check failed: %v", err)
 	}
 	log.Info("[OK] Supported Linux distribution detected.")
 
-	// if err := checkProcessArgs("k3s", "server"); err != nil {
-	// 	log.Panicf("[FAIL] K3s process argument check failed: %v", err)
-	// }
-	// log.Info("[OK] K3s process is running with expected arguments.")
+	if err := checkCommandExists("k3s"); err != nil {
+		log.Panicf("[FAIL] K3s binary check failed: %v", err)
+	}
+	log.Info("[OK] K3s binary is present in PATH.")
+
+	if mode == "server" {
+		err := checkServiceActive("k3s")
+		if err != nil {
+			log.Panicf("[FAIL] K3s service check failed: %v", err)
+		}
+		log.Info("[OK] K3s service is active.")
+
+		err = checkProcessArgs("k3s", "server")
+		if err != nil {
+			log.Panicf("[FAIL] K3s process argument check failed: %v", err)
+		}
+		log.Info("[OK] K3s process is running with expected arguments.")
+	}
 
 	if err := checkFirewallPort("6443", "tcp"); err != nil {
 		log.Panicf("[FAIL] Firewall port check failed: %v", err)
@@ -109,6 +118,14 @@ func checkFirewallPort(port, protocol string) error {
 
 	if !found {
 		return fmt.Errorf("port %s/%s not found in 'nixos-fw' chain", port, protocol)
+	}
+	return nil
+}
+
+func checkCommandExists(cmdName string) error {
+	_, err := exec.LookPath(cmdName)
+	if err != nil {
+		return fmt.Errorf("command '%s' not found in PATH", cmdName)
 	}
 	return nil
 }
