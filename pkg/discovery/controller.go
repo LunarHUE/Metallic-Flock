@@ -1,17 +1,29 @@
 package discovery
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	zeroconf "github.com/lunarhue/compute-flock-zeroconf"
+	"github.com/lunarhue/compute-flock/pkg/k3s"
 	"github.com/lunarhue/libs-go/log"
 )
 
 func RunControllerMode(NodeID string, Port uint16, callback func(ip string, role string)) {
 	log.Info("State: CONTROLLER. Managing Cluster...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	log.Infof("Starting K3s Server...")
+	if err := k3s.StartK3sServer(ctx); err != nil {
+		log.Panicf("Error: %v", err)
+	}
+	log.Infof("K3s Server started successfully.")
 
 	me := zeroconf.NewService(TypeController, NodeID, Port)
 
