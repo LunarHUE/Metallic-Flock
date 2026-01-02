@@ -8,7 +8,6 @@ import (
 
 type MemoryInfo struct {
 	TotalBytes int64 `json:"total_bytes"`
-	DimmCount  int   `json:"dimm_count"`
 }
 
 func GetMemoryInfo() (MemoryInfo, error) {
@@ -18,7 +17,6 @@ func GetMemoryInfo() (MemoryInfo, error) {
 	}
 
 	return MemoryInfo{
-		TotalBytes: mem.TotalPhysicalBytes,
-		DimmCount:  len(mem.Modules), // Counts physical sticks of RAM
+		TotalBytes: mem.TotalUsableBytes,
 	}, nil
 }
