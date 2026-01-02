@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"github.com/lunarhue/libs-go/log"
 
 	"github.com/lunarhue/compute-flock/pkg/discovery"
+	"github.com/lunarhue/compute-flock/pkg/fingerprint"
 	"github.com/lunarhue/compute-flock/pkg/k3s"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -52,6 +54,21 @@ func (s *server) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.H
 }
 
 func main() {
+	// TESTING
+	fingerprint, err := fingerprint.GetFingerprint()
+	if err != nil {
+		log.Panicf("Fingerprint failed: %v", err)
+	}
+
+	jsonResult, err := json.Marshal(fingerprint)
+	if err != nil {
+		log.Panicf("Failed to marshal json: %v", err)
+	}
+
+	//base64Result := base64.StdEncoding.EncodeToString(jsonResult)
+
+	log.Infof("Fingerprint: %s", jsonResult)
+
 	mode := flag.String("mode", "auto", "Force mode: server, agent, auto")
 	noVerify := flag.Bool("no-verify", false, "Skip K3s installation verification")
 	flag.Parse()
