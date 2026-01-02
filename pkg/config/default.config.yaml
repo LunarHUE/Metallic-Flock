@@ -1,0 +1,6 @@
+
+default_port: 9000
+mode: agent
+
+log_level: info
+log_file: /var/log/metallic-flock/metallic-flock.log
