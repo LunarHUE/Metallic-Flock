@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -11,7 +10,7 @@ import (
 
 	"github.com/lunarhue/libs-go/log"
 
-	"github.com/lunarhue/metallic-flock/pkg/discovery"
+	"github.com/lunarhue/metallic-flock/cmd/debug"
 	"github.com/lunarhue/metallic-flock/pkg/k3s"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -41,11 +40,8 @@ type server struct {
 
 var rootCmd = &cobra.Command{
 	Use:   "metallic",
-	Short: "Short placeholder",
-	Long:  `Long placeholder`,
-	Run: func(cmd *cobra.Command, args []string) {
-		main()
-	},
+	Short: "Used to create base k3s cluster.",
+	Long:  `Sets up the controller and agent relationship and does cluster authentication.`,
 }
 
 func Execute() {
@@ -56,7 +52,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.AddCommand(testCmd)
+	rootCmd.AddCommand(debug.RootCmd)
 }
 
 func (s *server) Adopt(ctx context.Context, req *pb.AdoptRequest) (*pb.AdoptResponse, error) {
@@ -70,46 +66,6 @@ func (s *server) Adopt(ctx context.Context, req *pb.AdoptRequest) (*pb.AdoptResp
 
 func (s *server) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.HeartbeatResponse, error) {
 	return &pb.HeartbeatResponse{Reconfigure: false}, nil
-}
-
-func main() {
-	mode := flag.String("mode", "auto", "Force mode: server, agent, auto")
-	noVerify := flag.Bool("no-verify", false, "Skip K3s installation verification")
-	flag.Parse()
-
-	hostname, _ := os.Hostname()
-	NodeID = hostname
-
-	// Verify that the prerequisites are met
-	if !*noVerify {
-		if err := k3s.VerifyK3sInstallation(*mode); err != nil {
-			log.Panicf("K3s verification failed: %v", err)
-		}
-	}
-
-	// Start GRPC Server (Listens on all modes)
-	apiPort := findOpenPort(DefaultPort)
-	if apiPort == 0 {
-		log.Panic("No open port found")
-	} else if apiPort != DefaultPort {
-		log.Warnf("Default port %d is in use. Using port %d instead.", DefaultPort, apiPort)
-	}
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", apiPort))
-	if err != nil {
-		log.Panicf("failed to listen: %v", err)
-	}
-	s := grpc.NewServer()
-	pb.RegisterFlockServiceServer(s, &server{})
-	go s.Serve(lis)
-
-	// STATE MACHINE
-	switch *mode {
-	case "server":
-		discovery.RunControllerMode(NodeID, uint16(DefaultPort), func(ip, role string) { adoptNode(currentLocalIP(), ip, role) })
-	case "agent":
-		discovery.RunPendingMode(NodeID, uint16(DefaultPort))
-	}
 }
 
 func findOpenPort(defaultPort int) int {
