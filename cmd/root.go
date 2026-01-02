@@ -1,8 +1,7 @@
-package main
+package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -13,8 +12,8 @@ import (
 	"github.com/lunarhue/libs-go/log"
 
 	"github.com/lunarhue/metallic-flock/pkg/discovery"
-	"github.com/lunarhue/metallic-flock/pkg/fingerprint"
 	"github.com/lunarhue/metallic-flock/pkg/k3s"
+	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -40,6 +39,26 @@ type server struct {
 	pb.UnimplementedFlockServiceServer
 }
 
+var rootCmd = &cobra.Command{
+	Use:   "metallic",
+	Short: "Short placeholder",
+	Long:  `Long placeholder`,
+	Run: func(cmd *cobra.Command, args []string) {
+		main()
+	},
+}
+
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func init() {
+	rootCmd.AddCommand(testCmd)
+}
+
 func (s *server) Adopt(ctx context.Context, req *pb.AdoptRequest) (*pb.AdoptResponse, error) {
 	log.Infof("Received ADOPT command. Role: %s, Controller: %s", req.Role, req.ControllerIp)
 	log.Infof("Cluster Token: %s", req.ClusterToken)
@@ -54,21 +73,6 @@ func (s *server) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.H
 }
 
 func main() {
-	// TESTING
-	fingerprint, err := fingerprint.GetFingerprint()
-	if err != nil {
-		log.Panicf("Fingerprint failed: %v", err)
-	}
-
-	jsonResult, err := json.Marshal(fingerprint)
-	if err != nil {
-		log.Panicf("Failed to marshal json: %v", err)
-	}
-
-	//base64Result := base64.StdEncoding.EncodeToString(jsonResult)
-
-	log.Infof("Fingerprint: %s", jsonResult)
-
 	mode := flag.String("mode", "auto", "Force mode: server, agent, auto")
 	noVerify := flag.Bool("no-verify", false, "Skip K3s installation verification")
 	flag.Parse()
