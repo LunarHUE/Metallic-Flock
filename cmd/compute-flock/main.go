@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -66,9 +65,9 @@ func main() {
 		log.Panicf("Failed to marshal json: %v", err)
 	}
 
-	base64Result := base64.StdEncoding.EncodeToString(jsonResult)
+	//base64Result := base64.StdEncoding.EncodeToString(jsonResult)
 
-	log.Infof("Fingerprint: %s", base64Result)
+	log.Infof("Fingerprint: %s", jsonResult)
 
 	mode := flag.String("mode", "auto", "Force mode: server, agent, auto")
 	noVerify := flag.Bool("no-verify", false, "Skip K3s installation verification")
