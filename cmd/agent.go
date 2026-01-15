@@ -24,6 +24,11 @@ var agentCmd = &cobra.Command{
 			log.Panicf("Failed to load config: %v", err)
 		}
 
+		testByte, err := os.ReadFile("/.dockerenv")
+		// if err == nil && len(testByte) > 0 {
+		// 	log.Warn("Running inside a container! Ensure that necessary privileges are granted.")
+		// }
+
 		hostname, _ := os.Hostname()
 		// Verify that the prerequisites are met
 		if !noVerify {
