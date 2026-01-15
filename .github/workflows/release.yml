@@ -1,0 +1,45 @@
+name: Release to Public Repo
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        
+      - name: Setup Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build Binary
+        run: nix build -L
+
+      - name: Prepare Artifact
+        run: |
+          mkdir -p release_dist
+          # Nix builds creating a symlink called 'result'. 
+          # We resolve it to copy the actual file.
+          # REPLACE 'bin/your-app' with the actual path inside result/
+          cp -L result/bin/YOUR_BINARY_NAME release_dist/YOUR_BINARY_NAME
+          
+          # Optional: Make it executable just in case
+          chmod +x release_dist/YOUR_BINARY_NAME
+
+      - name: Push to External Repository
+        uses: cpina/github-action-push-to-another-repository@v1.7.2
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source-directory: 'release_dist'
+          destination-github-username: 'target-user-name'
+          destination-repository-name: 'target-repo-name'
+          user-email: 'your-email@example.com'
+          target-branch: main
+          # This creates a folder in the target repo. 
+          # Leave empty to push to root, or name it (e.g., 'bin')
+          target-directory: 'bin'
