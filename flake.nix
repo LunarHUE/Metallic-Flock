@@ -22,6 +22,7 @@
               ./pkg
               ./go.mod
               ./go.sum
+              ./main.go
             ];
           };
 
